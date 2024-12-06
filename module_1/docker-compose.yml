@@ -82,6 +82,10 @@ services:
       - "55001:5432"
     volumes: 
       - ./feast-postgres-data:/var/lib/postgresql/data
+      - ./postgresql.conf:/etc/postgresql/postgresql.conf
+
+    command: postgres -c 'config_file=/etc/postgresql/postgresql.conf'  # Use the mounted path
+
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "postgres"]
       interval: 5s

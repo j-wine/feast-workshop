@@ -3,7 +3,7 @@ from feast.repo_config import RegistryConfig
 
 # TODO: replace with your bucket
 repo_config = RepoConfig(
-    registry=RegistryConfig(path="gs://feast-workshop-danny/registry.pb"),
+    registry=RegistryConfig(path="gs://feast-workshop-feast-workshop/registry.pb"),
     project="feast_demo_gcp",
     provider="gcp",
     offline_store="file",  # Could also be the OfflineStoreConfig e.g. FileOfflineStoreConfig
