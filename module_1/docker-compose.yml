@@ -81,13 +81,12 @@ services:
     ports:
       - "55001:5432"  # Expose port 5432 to localhost
 
-    volumes: 
+    volumes:
       - ./feast-postgres-data:/var/lib/postgresql/data
       - ./postgresql.conf:/etc/postgresql/postgresql.conf
       - ./pg_hba.conf:/var/lib/postgresql/data/pg_hba.conf
 
-    command: postgres -c 'config_file=/etc/postgresql/postgresql.conf'  # Use the mounted path
-             postgres -c listen_addresses='*'  -c max_connections=200
+    command: postgres -c 'config_file=/etc/postgresql/postgresql.conf' -c listen_addresses='*'  -c max_connections=200
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "postgres"]
       interval: 5s
