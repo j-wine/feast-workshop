@@ -1,11 +1,17 @@
 import os
 import pandas as pd
+from nltk.tokenize import sent_tokenize
 from transformers import AutoTokenizer, AutoModel
 import torch
 import torch.nn.functional as F
 
-INPUT_FILENAME = "./data/city_wikipedia_summaries.csv"
-EXPORT_FILENAME = "./data/city_wikipedia_summaries_with_embeddings.parquet"
+BASE_DIR = os.path.abspath(os.path.join(os.getcwd(), "feature_repo"))
+DATA_DIR = os.path.join(BASE_DIR, "data")
+INPUT_FILENAME = os.path.join(DATA_DIR, "city_wikipedia_summaries.csv")
+CHUNKED_FILENAME = os.path.join(DATA_DIR, "city_wikipedia_summaries_chunked.csv")
+EXPORT_FILENAME = os.path.join(
+    DATA_DIR, "city_wikipedia_summaries_with_embeddings.parquet"
+)
 TOKENIZER = "sentence-transformers/all-MiniLM-L6-v2"
 MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
@@ -36,23 +42,56 @@ def run_model(sentences, tokenizer, model):
 
 
 def score_data() -> None:
-    if EXPORT_FILENAME not in os.listdir():
-        print("scored data not found...generating embeddings...")
-        df = pd.read_csv(INPUT_FILENAME)
+    os.makedirs(DATA_DIR, exist_ok=True)
+
+    if not os.path.exists(EXPORT_FILENAME):
+        print("Scored data not found... generating embeddings...")
+
+        if not os.path.exists(CHUNKED_FILENAME):
+            print("Chunked data not found... generating chunked data...")
+            df = pd.read_csv(INPUT_FILENAME)
+            df["Sentence Chunks"] = df["Wiki Summary"].apply(lambda x: sent_tokenize(x))
+            chunked_df = df.explode("Sentence Chunks")
+            chunked_df.to_csv(CHUNKED_FILENAME, index=False)
+            df = chunked_df
+        else:
+            df = pd.read_csv(CHUNKED_FILENAME)
+
         tokenizer = AutoTokenizer.from_pretrained(TOKENIZER)
         model = AutoModel.from_pretrained(MODEL)
-        embeddings = run_model(df["Wiki Summary"].tolist(), tokenizer, model)
-        print(embeddings)
-        print("shape = ", df.shape)
-        df["Embeddings"] = list(embeddings.detach().cpu().numpy())
+        embeddings = run_model(df["Sentence Chunks"].tolist(), tokenizer, model)
         print("embeddings generated...")
+        df["id"] = [i for i in range(len(df))]
+        df["Embeddings"] = list(embeddings.detach().cpu().numpy())
         df["event_timestamp"] = pd.to_datetime("today")
         df["item_id"] = df.index
-        print(df.head())
+        df = _rename_df(df)
+
         df.to_parquet(EXPORT_FILENAME, index=False)
-        print("...data exported. job complete")
+        print("...data exported. Job complete")
     else:
-        print("scored data found...skipping generating embeddings.")
+        df = pd.read_parquet(EXPORT_FILENAME)
+        print("Scored data found... skipping generating embeddings.")
+
+    print("preview of data:")
+    print(df.head().T)
+
+
+def _rename_df(df: pd.DataFrame) -> pd.DataFrame:
+    df.columns = [c.replace(" ", "_").lower() for c in df.columns]
+    df.rename({"embeddings": "vector"}, axis=1, inplace=True)
+    df = df[
+        [
+            "id",
+            "item_id",
+            "event_timestamp",
+            "state",
+            "wiki_summary",
+            "sentence_chunks",
+            "vector",
+        ]
+    ]
+    return df
 
 
 if __name__ == "__main__":
